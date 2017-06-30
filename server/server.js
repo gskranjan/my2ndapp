@@ -1,4 +1,4 @@
-
+var _=require('lodash');
 var express=require('express');
 var bodyParser=require('body-parser');
 
@@ -8,14 +8,17 @@ var mongoose=m.mongoose;
 var t=require('./modules/todo.js');
 var todo=t.todo;
 var u=require('./modules/user.js');
-var user=u.user;
+var User=u.User;
 var objectid=require('mongodb').ObjectId;
 
 var app=express();
 
-const port=process.env.port||3000;
+
 
 app.use(bodyParser.json());
+
+
+
 
 app.post('/todos',(req,res)=>{
     var r=new todo({
@@ -29,8 +32,8 @@ app.post('/todos',(req,res)=>{
 });
 
 app.get('/todos',(req,res)=>{
-    todo.find().then((results)=>{
-        res.send({results});
+    todo.find().then((todos)=>{
+        res.send({todos});
     },(e)=>{
         res.status(400).send(e);
     })
@@ -42,21 +45,96 @@ app.get('/todos/:id',(req,res)=>{
        return res.status(404).send({});
     }
     
-    todo.findById(id).then((todos)=>{
-        if(!todos){
+    todo.findById(id).then((todo)=>{
+        if(!todo){
            return res.status(404).send({});
         }
-        res.send({"todos":todos});
+        res.send({todo});
         
     },(e)=>{
         return res.status(400).send({});
     })
 })
 
-
-app.listen(port,()=>{
-    console.log('server is on');
+app.delete('/todos/:id',(req,res)=>{
+    var id=req.params.id;
+    if(!objectid.isValid(id)){
+        return res.status(404).send({});
+    }
+    
+    todo.findByIdAndRemove(id).then((result)=>{
+        if(!result){
+            return res.status(404);
+        }
+    res.send({todo:result});
+        
+        
+    },(e)=>{
+        res.status(400).send(e);
+    });
 })
+
+app.patch('/todos/:id',(req,res)=>{
+    var id=req.params.id;
+    var body=_.pick(req.body,['test','completed']);
+    if(!objectid.isValid(id)){
+       
+        return res.status(404).send();
+    }
+    if(_.isBoolean(body.completed)&&body.completed){
+        body.completedAt=new Date().getTime();
+    }
+    else{
+        body.completed=false;
+        body.completedAt=null;
+    }
+
+    todo.findByIdAndUpdate(id,{$set:body},{new:true}).then((todo)=>{
+        if(!todo){
+          
+            return res.status(404).send();
+        }
+        res.send({todo});
+    }).catch((e)=>{
+        res.status(400).send();
+    });
+    
+});
+
+/*
+app.post('/users', (req, res) => {
+  var body = _.pick(req.body, ['email', 'password']);
+  var user = new User(body);
+
+  user.save().then(() => {
+    return user.methods.generateAuthToken();
+  }).then((token) => {
+    res.header('x-auth', token).send(user);
+  }).catch((e) => {
+    res.status(400).send(e);
+  })
+});
+*/
+
+
+app.post('/users',(req,res)=>{
+    var body=_.pick(req.body,['email','password']);
+    var user=new User(body);
+    
+    user.save().then((user)=>{
+        return user.generateAuthToken();
+    }).then((token)=>{
+        res.header('x-auth',token).send(user);
+    }).catch((e)=>{
+        res.status(400).send(e);
+    })
+    
+});
+
+
+app.listen(3000,()=>{
+    console.log('server is on');
+});
 
 
 module.exports.app=app;
